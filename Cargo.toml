@@ -1,0 +1,10 @@
+[package]
+name = "bulk_image_formatter"
+version = "0.1.0"
+authors = ["Lee Martin <lee.martin@pliminus.co.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+image = "0.23.14"
