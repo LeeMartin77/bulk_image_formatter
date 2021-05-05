@@ -3,15 +3,22 @@ use image::io::Reader as ImageReader;
 
 fn main() -> io::Result<()> {
     let stdin = io::stdin();
-    for line in stdin.lock().lines() {
-        let lineres = line.unwrap();
-        let mut parts = lineres.split(":");
-        let source = parts.next().unwrap();
-        let target = parts.next().unwrap();
-        match ImageReader::open(&source)?.decode() {
-            Ok(okimg) => save_image_to_output(okimg, format!("{}", target)),
-            Err(_) => write_error_to_log(format!("Error read: {}", source))
+    for stdline in stdin.lock().lines() {
+        match stdline {
+            Ok(line) => {
+                let mut parts = line.split(":");
+                if let Some(source) = parts.next() {
+                    if let Some(target) = parts.next() {
+                        match ImageReader::open(&source)?.decode() {
+                            Ok(okimg) => save_image_to_output(okimg, target.to_string()),
+                            Err(_) => write_error_to_log(format!("Error read: {}", source))
+                        }
+                    }
+                }
+            },
+            Err(_) => write_error_to_log("Failed to read stdin line".to_string())
         }
+
     }
     Ok(())
 }
