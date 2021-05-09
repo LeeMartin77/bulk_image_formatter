@@ -45,7 +45,7 @@ fn main() -> io::Result<()> {
 }
 
 fn process_line(stdline: Result<std::string::String, std::io::Error>, arguments: &ProcessingArguments) -> () {
-    if let Ok(bulksourcetarget) = stdline.map_err(|e| BulkImageFormatError::StdInError)
+    if let Ok(bulksourcetarget) = stdline.map_err(|_e| BulkImageFormatError::StdInError)
         .and_then(|line| turn_line_into_source_and_target(line.split(":"))) {
 
             let _result = format_from_source_to_target(bulksourcetarget.source.as_str())
