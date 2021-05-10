@@ -14,11 +14,10 @@ struct BulkImageSourceTarget {
 
 enum BulkImageFormatError {
     SaveError,
-    StdOutError,
-    StdInError,
     ReadFailure,
     SourceError,
-    TargetError
+    TargetError,
+    LineError
 }
 
 fn main() -> io::Result<()> {
@@ -39,22 +38,21 @@ fn main() -> io::Result<()> {
     };
     let stdin = io::stdin();
     for stdline in stdin.lock().lines() {
-        process_line(stdline, &arguments)
+        if let Ok(line) = stdline {
+            if let Ok(saveloc) = process_line(line, &arguments) {
+                let _ = io::stdout().write((saveloc + "\n").as_bytes());
+            }
+        }
     }
     Ok(())
 }
 
-fn process_line(stdline: Result<std::string::String, std::io::Error>, arguments: &ProcessingArguments) -> () {
-    if let Ok(bulksourcetarget) = stdline.map_err(|_e| BulkImageFormatError::StdInError)
-        .and_then(|line| turn_line_into_source_and_target(line.split(":"))) {
-
-            let _result = format_from_source_to_target(bulksourcetarget.source.as_str())
-                .and_then(|img| save_image_to_output(img, bulksourcetarget.target, arguments))
-                .and_then(|saveloc| write_path_to_stdout(saveloc));
-
-        }
-    
-    return ();
+fn process_line(line: String, arguments: &ProcessingArguments) -> Result<String, BulkImageFormatError> {
+    if let Ok(bulksourcetarget) = turn_line_into_source_and_target(line.split(":")) {
+        return format_from_source_to_target(bulksourcetarget.source.as_str())
+            .and_then(|img| save_image_to_output(img, bulksourcetarget.target, arguments))
+    }
+    Err(BulkImageFormatError::LineError)
 }
 
 fn turn_line_into_source_and_target(mut parts: std::str::Split<&str>) -> Result<BulkImageSourceTarget, BulkImageFormatError> {
@@ -62,10 +60,8 @@ fn turn_line_into_source_and_target(mut parts: std::str::Split<&str>) -> Result<
         if let Some(target) = parts.next() {
             return Ok(BulkImageSourceTarget{source: source.to_string(), target: target.to_string()});
         }
-        write_error_to_log("Failed to read target".to_string());
         return Err(BulkImageFormatError::TargetError);
     }
-    write_error_to_log("Failed to read source".to_string());
     return Err(BulkImageFormatError::SourceError);
 }
 
@@ -76,7 +72,6 @@ fn format_from_source_to_target(source: &str) -> Result<image::DynamicImage, Bul
         }
         
     }
-    write_error_to_log(format!("Error read: {}", source));
     Err(BulkImageFormatError::ReadFailure)
 }
 
@@ -84,24 +79,10 @@ fn save_image_to_output(img: image::DynamicImage, target: String, arguments: &Pr
     
     let path_to_target = Path::new(&target);
     let path_to_target = path_to_target.with_extension(&arguments.format);
-
     if let Some(path) = path_to_target.as_path().to_str() {
         if let Ok(_) = img.save(&path) {
             return Ok(path.to_string());
         }
     }
-    write_error_to_log(format!("Failed to write to save {}", target));
     Err(BulkImageFormatError::SaveError)
-}
-
-fn write_path_to_stdout(savelocation: String) -> Result<(), BulkImageFormatError> {
-    if let Ok(_) = io::stdout().write((savelocation + "\n").as_bytes()) {
-        return Ok(())
-    }
-    write_error_to_log(format!("Failed to write to stdout"));
-    Err(BulkImageFormatError::StdOutError)
-}
-
-fn write_error_to_log(error: String) -> () {
-    println!("Error: {}", error);
 }
