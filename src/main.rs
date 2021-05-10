@@ -20,8 +20,7 @@ enum BulkImageFormatError {
     ReadFailure,
     SourceError,
     TargetError,
-    LineError,
-    CropFailure
+    LineError
 }
 
 fn main() -> io::Result<()> {
