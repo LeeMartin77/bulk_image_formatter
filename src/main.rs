@@ -1,10 +1,13 @@
+use image::GenericImageView;
+use std::str::FromStr;
 use std::path::Path;
 use std::io::{self, BufRead, Write };
 use image::io::Reader as ImageReader;
 use clap::{Arg, App};
 
 struct ProcessingArguments {
-    format: String
+    format: String,
+    square: bool
 }
 
 struct BulkImageSourceTarget {
@@ -17,7 +20,8 @@ enum BulkImageFormatError {
     ReadFailure,
     SourceError,
     TargetError,
-    LineError
+    LineError,
+    CropFailure
 }
 
 fn main() -> io::Result<()> {
@@ -32,9 +36,17 @@ fn main() -> io::Result<()> {
                             .help("Output image format")
                             .default_value("jpg")
                             .possible_values(&["jpg", "png", "bmp"]))
+                    .arg(Arg::with_name("square")
+                            .short("sq")
+                            .long("square")
+                            .takes_value(true)
+                            .help("Crop image to a square")
+                            .default_value("false")
+                            .possible_values(&["true", "false"]))
                     .get_matches();
     let arguments = ProcessingArguments{
-        format: matches.value_of("format").unwrap_or("jpg").to_string()
+        format: matches.value_of("format").unwrap_or("jpg").to_string(),
+        square: FromStr::from_str(matches.value_of("square").unwrap_or("false")).unwrap_or(false)
     };
     let stdin = io::stdin();
     for stdline in stdin.lock().lines() {
@@ -50,6 +62,7 @@ fn main() -> io::Result<()> {
 fn process_line(line: String, arguments: &ProcessingArguments) -> Result<String, BulkImageFormatError> {
     if let Ok(bulksourcetarget) = turn_line_into_source_and_target(line.split(":")) {
         return format_from_source_to_target(bulksourcetarget.source.as_str())
+            .and_then(|img| crop_image(img, arguments))
             .and_then(|img| save_image_to_output(img, bulksourcetarget.target, arguments))
     }
     Err(BulkImageFormatError::LineError)
@@ -73,6 +86,27 @@ fn format_from_source_to_target(source: &str) -> Result<image::DynamicImage, Bul
         
     }
     Err(BulkImageFormatError::ReadFailure)
+}
+
+fn crop_image(img: image::DynamicImage, arguments: &ProcessingArguments) -> Result<image::DynamicImage, BulkImageFormatError> {
+    if !arguments.square || img.width() == img.height() {
+        return Ok(img);
+    }
+    if img.width() > img.height() {
+        let x: u32 = (img.width() - img.height()) / 2 ;
+        let y: u32 = 0;
+        let width: u32 = img.height();
+        let height: u32 = img.height();
+        return Ok(img.crop_imm(x, y, width, height))
+    }
+    else
+    {
+        let x: u32 = 0;
+        let y: u32 = (img.height() - img.width()) / 2 ;
+        let width: u32 = img.width();
+        let height: u32 = img.width();
+        return Ok(img.crop_imm(x, y, width, height))
+    }
 }
 
 fn save_image_to_output(img: image::DynamicImage, target: String, arguments: &ProcessingArguments) -> Result<String, BulkImageFormatError>  {
